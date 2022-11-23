@@ -335,13 +335,14 @@ class NNPCompatibilityMixin(object):
             raise NotImplementedError(f"""`lambda_protocol` is currently placeholding; only default `None` 
                                       is allowed until the `lambda_protocol` class is appropriately generalized""")
         
-        init_sampler_state = SamplerState(init_positions, box_vectors = mixed_system.getDefaultPeriodicBoxVectors())
         logger.info(f"making lambda states...")
-        for lambda_val in lambda_schedule:
+        for i, lambda_val in enumerate(lambda_schedule):
             compound_thermostate_copy = deepcopy(compound_thermostate)
             compound_thermostate_copy.set_alchemical_parameters(lambda_val, lambda_protocol)
             thermostate_list.append(compound_thermostate_copy)
-            sampler_state_list.append(deepcopy(init_sampler_state))
+            # Use different initial positions for each replica
+            sampler_state = SamplerState(init_positions[i], box_vectors = mixed_system.getDefaultPeriodicBoxVectors())
+            sampler_state_list.append(deepcopy(sampler_state))
         
         reporter = MultiStateReporter(**storage_kwargs)
         self.create(thermodynamic_states = thermostate_list, sampler_states = sampler_state_list, storage=reporter)
