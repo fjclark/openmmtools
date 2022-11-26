@@ -345,7 +345,6 @@ class NNPCompatibilityMixin(object):
             compound_thermostate_copy.set_alchemical_parameters(lambda_val, lambda_protocol)
             # Parallel tempering - use different temperatures for each state
             compound_thermostate_copy._set_system_temperature(temperatures[i])
-            compound_thermostate_copy._set_integrator_temperature
             thermostate_list.append(compound_thermostate_copy)
             # Use different initial positions for each replica
             sampler_state = SamplerState(init_positions[i], box_vectors = mixed_system.getDefaultPeriodicBoxVectors())
