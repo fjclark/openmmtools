@@ -303,7 +303,7 @@ class NNPCompatibilityMixin(object):
         super().__init__(*args, **kwargs)
     
     def setup(self, n_states, mixed_system, 
-              init_positions, temperature, storage_kwargs, 
+              init_positions, temperatures, storage_kwargs, 
               n_replicas=None, lambda_schedule=None, 
               lambda_protocol=None, **unused_kwargs):
         from openmmtools.states import ThermodynamicState, SamplerState, CompoundThermodynamicState
@@ -311,8 +311,12 @@ class NNPCompatibilityMixin(object):
         from copy import deepcopy
         from openmmtools.multistate import MultiStateReporter
 
+        # Check we have the same number of temperatures as states
+        if len(temperatures) != n_states:
+            raise ValueError("The number of states must be equal to the number of temperatures provided.")
+
         lambda_zero_alchemical_state = NNPAlchemicalState.from_system(mixed_system)
-        thermostate = ThermodynamicState(mixed_system, temperature=temperature)
+        thermostate = ThermodynamicState(mixed_system, temperature=temperatures[0])
         compound_thermostate = CompoundThermodynamicState(thermostate, composable_states=[lambda_zero_alchemical_state])
         thermostate_list, sampler_state_list = [], []
         if n_replicas is None:
@@ -339,6 +343,9 @@ class NNPCompatibilityMixin(object):
         for i, lambda_val in enumerate(lambda_schedule):
             compound_thermostate_copy = deepcopy(compound_thermostate)
             compound_thermostate_copy.set_alchemical_parameters(lambda_val, lambda_protocol)
+            # Parallel tempering - use different temperatures for each state
+            compound_thermostate_copy._set_system_temperature(temperatures[i])
+            compound_thermostate_copy._set_integrator_temperature
             thermostate_list.append(compound_thermostate_copy)
             # Use different initial positions for each replica
             sampler_state = SamplerState(init_positions[i], box_vectors = mixed_system.getDefaultPeriodicBoxVectors())

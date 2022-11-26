@@ -89,9 +89,9 @@ class RepexConstructor():
     """
     def __init__(self, 
                  mixed_system : openmm.System,
-                 initial_positions: unit.Quantity,
+                 initial_positions: List[unit.Quantity],
                  n_states : int,
-                 temperature : unit.Quantity,
+                 temperatures : unit.Quantity,
                  storage_kwargs: Dict={'storage': 'repex.nc', 
                                        'checkpoint_interval': 10,
                                        'analysis_particle_indices': None},
@@ -107,7 +107,7 @@ class RepexConstructor():
                  **unused_kwargs):
         self._mixed_system = mixed_system
         self._storage_kwargs = storage_kwargs
-        self._temperature = temperature
+        self._temperatures = temperatures
         self._mcmc_moves = mcmc_moves
         self._mcmc_moves_kwargs = mcmc_moves_kwargs
         self._replica_exchange_sampler_kwargs = replica_exchange_sampler_kwargs
@@ -131,6 +131,6 @@ class RepexConstructor():
         _sampler.setup(n_states=self._n_states, 
                       mixed_system = self._mixed_system, 
                       init_positions = self._initial_positions, 
-                      temperature = self._temperature, 
+                      temperatures = self._temperatures, 
                       storage_kwargs = self._storage_kwargs)  
         return _sampler
