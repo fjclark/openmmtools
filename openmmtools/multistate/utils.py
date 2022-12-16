@@ -316,8 +316,6 @@ class NNPCompatibilityMixin(object):
             raise ValueError("The number of states must be equal to the number of temperatures provided.")
 
         lambda_zero_alchemical_state = NNPAlchemicalState.from_system(mixed_system)
-        thermostate = ThermodynamicState(mixed_system, temperature=temperatures[0])
-        compound_thermostate = CompoundThermodynamicState(thermostate, composable_states=[lambda_zero_alchemical_state])
         thermostate_list, sampler_state_list = [], []
         if n_replicas is None:
             n_replicas = n_states
@@ -341,10 +339,11 @@ class NNPCompatibilityMixin(object):
         
         logger.info(f"making lambda states...")
         for i, lambda_val in enumerate(lambda_schedule):
+            # Parallel tempering - use different temperatures for each state
+            thermostate = ThermodynamicState(mixed_system, temperature=temperatures[i])
+            compound_thermostate = CompoundThermodynamicState(thermostate, composable_states=[lambda_zero_alchemical_state])
             compound_thermostate_copy = deepcopy(compound_thermostate)
             compound_thermostate_copy.set_alchemical_parameters(lambda_val, lambda_protocol)
-            # Parallel tempering - use different temperatures for each state
-            compound_thermostate_copy._set_system_temperature(mixed_system, temperatures[i])
             thermostate_list.append(compound_thermostate_copy)
             # Use different initial positions for each replica
             sampler_state = SamplerState(init_positions[i], box_vectors = mixed_system.getDefaultPeriodicBoxVectors())
