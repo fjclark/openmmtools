@@ -8,7 +8,7 @@ from copy import deepcopy
 from openmmtools import cache
 from openmmtools import mcmc
 from openmmtools.mcmc import LangevinSplittingDynamicsMove
-from openmmtools.multistate import replicaexchange
+from openmmtools.multistate import replicaexchange, multistatesampler
 from openmmtools.multistate.utils import NNPCompatibilityMixin
 from openmmtools.alchemy import NNPAlchemicalState
 from typing import Dict, Any, Iterable, Union, Optional, List
@@ -20,6 +20,10 @@ def deserialize_xml(filename):
     return xml_deserialized
 
 class NNPRepexSampler(NNPCompatibilityMixin, replicaexchange.ReplicaExchangeSampler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class NNPMultistateSampler(NNPCompatibilityMixin, multistatesampler.MultiStateSampler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
@@ -100,7 +104,7 @@ class RepexConstructor():
                                                        'collision_rate': 1.0/unit.picoseconds,
                                                        'n_steps': 1000,
                                                        'reassign_velocities': True},
-                 replica_exchange_sampler_kwargs : Optional[Dict] = {'number_of_iterations': 5000,
+                 sampler_kwargs : Optional[Dict] = {'number_of_iterations': 5000,
                                                                      'online_analysis_interval': 10,
                                                                      'online_analysis_minimum_iterations': 10,
                                                                     },
@@ -110,7 +114,7 @@ class RepexConstructor():
         self._temperatures = temperatures
         self._mcmc_moves = mcmc_moves
         self._mcmc_moves_kwargs = mcmc_moves_kwargs
-        self._replica_exchange_sampler_kwargs = replica_exchange_sampler_kwargs
+        self._sampler_kwargs = sampler_kwargs
         self._n_states = n_states
         
         # initial positions
@@ -125,7 +129,59 @@ class RepexConstructor():
         context_cache = cache.ContextCache(capacity=None, time_to_live=None, platform=platform)
 
         mcmc_moves = self._mcmc_moves(**self._mcmc_moves_kwargs)
-        _sampler = NNPRepexSampler(mcmc_moves=mcmc_moves, **self._replica_exchange_sampler_kwargs)
+        _sampler = NNPRepexSampler(mcmc_moves=mcmc_moves, **self._sampler_kwargs)
+        _sampler.energy_context_cache = context_cache
+        _sampler.sampler_context_cache = context_cache
+        _sampler.setup(n_states=self._n_states, 
+                      mixed_system = self._mixed_system, 
+                      init_positions = self._initial_positions, 
+                      temperatures = self._temperatures, 
+                      storage_kwargs = self._storage_kwargs)  
+        return _sampler
+
+class MultistateConstructor():
+    """ 
+    Simple handler to build multistate sampler.
+    """
+    def __init__(self, 
+                 mixed_system : openmm.System,
+                 initial_positions: List[unit.Quantity],
+                 n_states : int,
+                 temperatures : unit.Quantity,
+                 storage_kwargs: Dict={'storage': 'repex.nc', 
+                                       'checkpoint_interval': 10,
+                                       'analysis_particle_indices': None},
+                 mcmc_moves : Optional[mcmc.MCMCMove] = mcmc.LangevinDynamicsMove, # MiddleIntegrator
+                 mcmc_moves_kwargs : Optional[Dict] = {'timestep': 1.0*unit.femtoseconds, 
+                                                       'collision_rate': 1.0/unit.picoseconds,
+                                                       'n_steps': 1000,
+                                                       'reassign_velocities': True},
+                 sampler_kwargs : Optional[Dict] = {'number_of_iterations': 5000,
+                                                                     'online_analysis_interval': 10,
+                                                                     'online_analysis_minimum_iterations': 10,
+                                                                    },
+                 **unused_kwargs):
+        self._mixed_system = mixed_system
+        self._storage_kwargs = storage_kwargs
+        self._temperatures = temperatures
+        self._mcmc_moves = mcmc_moves
+        self._mcmc_moves_kwargs = mcmc_moves_kwargs
+        self._sampler_kwargs = sampler_kwargs
+        self._n_states = n_states
+        
+        # initial positions
+        self._initial_positions = initial_positions
+        
+    @property
+    def sampler(self):
+        # set context cache
+        from openmmtools.utils import get_fastest_platform
+        from openmmtools import cache
+        platform = get_fastest_platform(minimum_precision='mixed')
+        context_cache = cache.ContextCache(capacity=None, time_to_live=None, platform=platform)
+
+        mcmc_moves = self._mcmc_moves(**self._mcmc_moves_kwargs)
+        _sampler = NNPMultistateSampler(mcmc_moves=mcmc_moves, **self._sampler_kwargs)
         _sampler.energy_context_cache = context_cache
         _sampler.sampler_context_cache = context_cache
         _sampler.setup(n_states=self._n_states, 
